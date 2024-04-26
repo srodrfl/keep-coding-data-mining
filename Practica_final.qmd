@@ -1,0 +1,172 @@
+---
+title: "practica_final"
+format: html
+editor: visual
+---
+
+Vamos a utilizar el dataset de semillas que se encuentra aquí: https://archive.ics.uci.edu/ml/datasets/seeds#
+
+Primero vamos a descargarnos el dataset con el siguiente comando:
+
+```{r}
+library(tidyverse)
+df_seeds <- read.table('https://archive.ics.uci.edu/ml/machine-learning-databases/00236/seeds_dataset.txt', col.names =c('area','perimetro','compacto','longitud','anchura','coeficient.asimetria','longitud.ranura','tipo'))
+```
+
+#### PREGUNTA 1
+
+¿Cuantas filas y cuantas columnas tiene el dataframe df_seeds?
+
+**Respuesta**:
+
+```{r}
+#nrow
+#ncol
+paste('Las filas que contiene el dataframe son',nrow(df_seeds))
+paste('Las columnas que contiene el dataframe son',ncol(df_seeds))
+```
+
+#### PREGUNTA 2
+
+Vamos a convertir en factor la columna tipo. Vamos a reemplazar los números por su correspondiente etiqueta (label). La correspondencia entre el código y el tipo es:
+
+-   1 - Kama
+-   2 - Rosa
+-   3 - Canadian
+
+Convierte en factor la columna tipo, respetando las etiquetas:
+
+**Respuesta**:
+
+```{r}
+df_seeds$tipo <- factor(df_seeds$tipo, levels = c(1, 2, 3),labels = c('Kama', 'Rosa', 'Canadian'))
+head(df_seeds)
+```
+
+#### PREGUNTA 3
+
+¿Cual es la media del area de cada uno de los tipos?
+
+**Respuesta**
+
+```{r}
+df_seeds |> group_by(tipo) |> summarise(media_area = mean(area))
+```
+
+```{r}
+#otra forma
+factores_tipo <- levels(df_seeds$tipo)
+paste("La media del area de", factores_tipo[1] ," es:", mean(df_seeds[df_seeds$tipo==factores_tipo[1],'area']))
+paste("La media del area de", factores_tipo[2] ," es:", mean(df_seeds[df_seeds$tipo==factores_tipo[2],'area']))
+paste("La media del area de", factores_tipo[3] ," es:", mean(df_seeds[df_seeds$tipo==factores_tipo[3],'area']))
+
+```
+
+#### PREGUNTA 4
+
+¿Como se llama el siguiente tipo de gráfico?. ¿Qué representa la línea del centro de la caja?
+
+```{r}
+ggplot(df_seeds, aes(x=tipo, y=area)) + geom_boxplot()
+```
+
+**Respuesta**: '' Es un gráfico de caja (boxplot) y la linea que atraviesa el centro de la caja es la mediana. La caja se crea a partir del rango intercuartílico (IQR).
+
+#### PREGUNTA 5
+
+¿Como pintarías un diagrama de puntos (o scatterplot) con ggplot con las siguientes características? - En el eje X la variable compacto - En el eje Y la variable area - Cada tipo de semilla debería tener un color diferente
+
+**Respuesta**:
+
+```{r}
+ggplot(df_seeds, aes(x = compacto, y = area, color = tipo))+geom_point()+xlab("Compacto")+ylab("Area [m2]")+ggtitle("Relación entre el área y el compacto")+theme_bw()
+```
+
+#### PREGUNTA 6
+
+¿Qué hace la siguiente línea?:
+
+```{r}
+df_seeds |> mutate(is_kama = tipo=='Kama') -> df_seeds
+```
+
+**Respuesta**: '' Crea una nueva columna en el dataframe llamada "is_kama" con valor "TRUE" si el tipo es = Kama y FALSE en caso contrario.
+
+#### PREGUNTA 7
+
+Vamos a dividir el conjunto de datos en test y training porque vamos a entrenar un modelo que me permita diferenciar si una semilla es de tipo Kama o no. ¿Por qué es aconsejable dividir el dataset en los grupos de train y test?
+
+```{r}
+set.seed(123) # Este set.seed hace que a todos nos generen los mismos número aleatorios
+idx <- sample(1:nrow(df_seeds), 0.7*nrow(df_seeds))
+df_seeds_train <- df_seeds[idx,]
+df_seeds_test <- df_seeds[-idx,]
+```
+
+**Respuesta**: ''El dataframe de training se va a utilizar para entrenar el modelo, en este caso con una muestra del 70% de los datos. El resto de datos, el dataframe de test, lo utilizaremos para evaluar la calidad del modelo. Son datos que no ha visto nuestro modelo 1 y por tanto nos muestra como de bien o mal predicirá con datos nuevos.
+
+#### PREGUNTA 8
+
+Vamos a crear un modelo para realizar una clasificación binaria, donde le pasaremos como entrada las columnas: area, perimetro, compacto, longitud, coeficient.asimetria y longitud.ranura
+
+¿Qué tipo de algoritmo o modelo debería usar?
+
+**Respuesta**: '' El modelo de regresión logística sirve para realizar una clasificación binaria.
+
+#### PREGUNTA 9
+
+Crea un modelo que me permita clasificar si una semilla es de tipo Kama o no con las siguientes columnas: area, perimetro, compacto, longitud, coeficient.asimetria, longitud.ranura
+
+**Respuesta**:
+
+```{r}
+
+model <- glm(df_seeds_train, formula = tipo ~ area+perimetro+compacto+longitud+coeficient.asimetria+longitud.ranura, family = binomial())
+
+model
+#He realizado un modelo de regresión logística con una distribución binomial, en el cual, el tipo se puede clasificar a partir de la formula del conjunto de columnas
+
+
+#Para comprobar los datos del modelo y ver si tienen sentido he realizado una matriz de confusión
+#cf <- caret::confusionMatrix(data = factor(predict(model, df_seeds_test)<0, labels = c('NoKama', 'Kama')), reference = factor(df_seeds_test$is_kama, labels=c('NoKama', 'Kama')))
+#cf
+```
+
+#### PREGUNTA 10
+
+Si usamos un umbral de 0 en la salida del modelo (lo que equivale a probabilidad de 0.5 cuando usamos el predict con type='response') ¿Cuales son los valores de precisión y exhausitividad?
+
+**Respuesta**.
+
+```{r}
+umbral <- 0.5
+pred_test<-predict(model, df_seeds_test, type="response")
+M=table(real=df_seeds_test$is_kama, prediction=pred_test<umbral)
+M
+cat("\n")
+paste("La precisión es:",M[2,2]/(M[1,2]+M[2,2]))
+paste("La exhaustividad es:",M[2,2]/(M[2,1]+M[2,2]))
+
+
+#Otra forma de hacerlo es con la matriz de confusión
+cat("\n\n ##Otra forma de hacerlo es con la matriz de confusión\n")
+cat("\n")
+cf <- caret::confusionMatrix(data = factor(predict(model, df_seeds_test)<umbral, labels = c('NoKama', 'Kama')), reference = factor(df_seeds_test$is_kama, labels=c('NoKama', 'Kama')))
+cf$table
+cat("\n")
+paste("La precisión es:",cf$table[2,2]/(cf$table[2,1]+cf$table[2,2]))
+paste("La exhaustividad es:",cf$table[2,2]/(cf$table[1,2]+cf$table[2,2]))
+
+```
+
+#### PREGUNTA 11
+
+¿Qué están haciendo las siguientes líneas?
+
+```{r}
+set.seed(123)
+cl<-df_seeds |> select(area,perimetro,compacto,longitud,anchura,coeficient.asimetria,longitud.ranura) |> kmeans(3)
+table(real=df_seeds$tipo,cluster=cl$cluster)
+```
+
+**Respuesta**: ''Crea tres cluster mediante el algoritmo de agrupación kmeans pasandole el dataframe de las semillas y guardandolo en la variable cl. Utiliza el dataframe y los parámetros definidos en el select para el algoritmo kmeans definiendo tres grupos. La tabla se usa para poder mostrar los datos con las etiquetas correspondientes y como están distribuidos los datos en los conjuntos. (La semilla que se define al principio es para que siempre salga el mismo conjunto de valores)
